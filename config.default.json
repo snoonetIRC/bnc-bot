@@ -1,0 +1,14 @@
+{
+  "user": "BNCServ",
+  "pass": "",
+  "status_prefix": "*",
+  "server": "bnc.snoonet.org",
+  "port": 5457,
+  "ssl": true,
+  "admins": [
+    "*!*@snoonet/staff/*",
+    "*!*@snoonet/manager/*",
+    "*!*@snoonet/owner/*",
+    "*!*@snoonet/founder/*"
+  ]
+}
