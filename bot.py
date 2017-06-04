@@ -330,7 +330,7 @@ class Conn(asyncio.Protocol):
                 self.chan_log(f"{nick} is not in the BNC queue.")
 
     def chan_log(self, msg):
-        self.send(f"PRIVMSG ##ldtest :{msg}")
+        self.send(f"PRIVMSG {self.config['log-channel']} :{msg}")
 
     def add_user(self, nick):
         passwd = self.gen_user_pass()

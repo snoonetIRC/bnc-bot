@@ -10,5 +10,6 @@
     "*!*@snoonet/manager/*",
     "*!*@snoonet/owner/*",
     "*!*@snoonet/founder/*"
-  ]
+  ],
+  "log-channel": "##sysop"
 }
