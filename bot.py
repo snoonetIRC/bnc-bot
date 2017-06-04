@@ -385,6 +385,7 @@ class Conn(asyncio.Protocol):
             self.chan_log(f"{nick} is not a current BNC user")
             return
         self.module_msg('controlpanel', f"deluser {nick}")
+        self.send("znc saveconfig")
         del self.bnc_data['users'][nick]
         self.chan_log(f"{mask} Removed BNC: {nick}")
         self.save_data()
@@ -396,6 +397,8 @@ class Conn(asyncio.Protocol):
                 self.chan_log(f"{nick} is not a BNC user.")
                 return
             passwd = self.gen_user_pass()
+            self.module_msg('controlpanel', f"Set Password {nick} {passwd}")
+            self.send("znc saveconfig")
             self.chan_log(f"BNC password reset for {nick}")
             self.send(
                 f"MS Send {nick} [New Password!] Your BNC auth is Username: "
