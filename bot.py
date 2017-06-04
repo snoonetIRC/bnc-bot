@@ -35,6 +35,7 @@ class Conn(asyncio.Protocol):
         self.register_cmd(self.add_bnc, "addbnc", admin=True)
         self.register_cmd(self.del_bnc, "delbnc", admin=True)
         self.register_cmd(self.update_users, "bncrefresh", admin=True)
+        self.register_cmd(self.resetpass, "bncresetpass", admin=True)
 
     @property
     def admins(self):
@@ -316,19 +317,6 @@ class Conn(asyncio.Protocol):
             del self.bnc_data['queue'][nick]
         self.save_data()
 
-    async def accept(self, mask, text):
-        if text:
-            nick = text.strip().split(None, 1)[0]
-            if nick in self.bnc_data['queue']:
-                self.rem_queue(nick)
-                self.add_user(nick)
-                self.chan_log(
-                    f"{nick} has been set with BNC access and "
-                    f"memoserved credentials."
-                )
-            else:
-                self.chan_log(f"{nick} is not in the BNC queue.")
-
     def chan_log(self, msg):
         self.send(f"PRIVMSG {self.config['log-channel']} :{msg}")
 
@@ -351,6 +339,19 @@ class Conn(asyncio.Protocol):
         )
         self.bnc_data.setdefault('users', {})[nick] = host
         self.save_data()
+
+    async def accept(self, mask, text):
+        if text:
+            nick = text.strip().split(None, 1)[0]
+            if nick in self.bnc_data['queue']:
+                self.rem_queue(nick)
+                self.add_user(nick)
+                self.chan_log(
+                    f"{nick} has been set with BNC access and "
+                    f"memoserved credentials."
+                )
+            else:
+                self.chan_log(f"{nick} is not in the BNC queue.")
 
     async def deny(self, mask, text):
         if text:
@@ -387,6 +388,21 @@ class Conn(asyncio.Protocol):
         del self.bnc_data['users'][nick]
         self.chan_log(f"{mask} Removed BNC: {nick}")
         self.save_data()
+
+    async def resetpass(self, mask, text):
+        if text:
+            nick = text.strip().split()[0]
+            if nick not in self.bnc_data['users']:
+                self.chan_log(f"{nick} is not a BNC user.")
+                return
+            passwd = self.gen_user_pass()
+            self.chan_log(f"BNC password reset for {nick}")
+            self.send(
+                f"MS Send {nick} [New Password!] Your BNC auth is Username: "
+                f"{nick} Password: {passwd} (Ports: 5457 for SSL - "
+                f"5456 for NON-SSL) Help: /server bnc.snoonet.org 5456 and "
+                f"/PASS {nick}:{passwd}"
+            )
 
     def get_bind_host(self):
         while True:
