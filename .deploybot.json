@@ -1,0 +1,46 @@
+[
+  {
+    "name": "bot-deploy",
+    "triggers": [
+      "push"
+    ],
+    "branches": [
+      "master"
+    ],
+    "remote-deploy": true,
+    "deploy-path": "ircbots/bnc-bot",
+    "servers": [
+      "linuxdaemon-vps"
+    ],
+    "script": [
+      "kill -SIGINT $(cat .bncbot.pid)"
+    ],
+    "match_files": [
+      "bncbot/*"
+    ],
+    "file-deploy": true
+  },
+  {
+    "name": "update-deps",
+    "triggers": [
+      "push"
+    ],
+    "branches": [
+      "master"
+    ],
+    "remote-deploy": true,
+    "deploy-path": "ircbots/bnc-bot",
+    "servers": [
+      "linuxdaemon-vps"
+    ],
+    "match_files": [
+      "requirements.txt"
+    ],
+    "file-deploy": true,
+    "script": [
+      "venv/bin/pip install -U -r requirements.txt",
+      "kill -SIGINT $(cat .bncbot.pid)"
+    ]
+  }
+]
+
