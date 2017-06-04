@@ -72,14 +72,14 @@ class Conn(asyncio.Protocol):
         del self._connected_future
 
     def connection_lost(self, exc) -> None:
-        self.connected = False
         self._connected_future = self.loop.create_future()
+        self.connected = False
         if exc is not None:
             asyncio.ensure_future(self.connect(), loop=self.loop)
 
     def eof_received(self) -> bool:
-        self.connected = False
         self._connected_future = self.loop.create_future()
+        self.connected = False
         asyncio.ensure_future(self.connect(), loop=self.loop)
         return True
 
@@ -151,7 +151,11 @@ class Conn(asyncio.Protocol):
         self.quit()
         if self.connected:
             self._transport.close()
-            self.connected = False
+
+    async def shutdown(self, restart=False):
+        self.close()
+        await asyncio.sleep(1, loop=self.loop)
+        self.stopped_future.set_result(restart)
 
     def data_received(self, data: bytes) -> None:
         self.buff += data
