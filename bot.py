@@ -302,6 +302,7 @@ class Conn(asyncio.Protocol):
             registered_time = await self.futures['ns_info']
             del self.futures['ns_info']
         self.add_queue(acct, registered_time)
+        self.send(f"PRIVMSG {nick} :Request submitted.")
         self.chan_log(
             f"{acct} added to bnc queue. Registered {registered_time}"
         )
