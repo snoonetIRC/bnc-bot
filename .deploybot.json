@@ -14,7 +14,7 @@
     ],
     "file-deploy": true,
     "script": [
-      "kill -SIGINT $(cat .bncbot.pid)"
+      "cat .bncbot.pid | kill -SIGINT"
     ],
     "match_files": [
       "bncbot/*"
@@ -36,7 +36,7 @@
     "file-deploy": true,
     "script": [
       "venv/bin/pip install -U -r requirements.txt",
-      "kill -SIGINT $(cat .bncbot.pid)"
+      "cat .bncbot.pid | kill -SIGINT"
     ],
     "match_files": [
       "requirements.txt"
