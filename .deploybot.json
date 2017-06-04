@@ -12,13 +12,13 @@
     "servers": [
       "linuxdaemon-vps"
     ],
+    "file-deploy": true,
     "script": [
       "kill -SIGINT $(cat .bncbot.pid)"
     ],
     "match_files": [
       "bncbot/*"
     ],
-    "file-deploy": true
   },
   {
     "name": "update-deps",
@@ -33,13 +33,13 @@
     "servers": [
       "linuxdaemon-vps"
     ],
-    "match_files": [
-      "requirements.txt"
-    ],
     "file-deploy": true,
     "script": [
       "venv/bin/pip install -U -r requirements.txt",
       "kill -SIGINT $(cat .bncbot.pid)"
+    ],
+    "match_files": [
+      "requirements.txt"
     ]
   }
 ]
