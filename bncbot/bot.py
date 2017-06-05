@@ -20,7 +20,9 @@ def raw(*cmds):
             HANDLERS.setdefault('raw', {}).setdefault(cmd, []).append(func)
 
     if len(cmds) == 1 and callable(cmds[0]):
-        return _decorate(cmds[0])
+        func = cmds[0]
+        cmds = ()
+        return _decorate(func)
     return _decorate
 
 
