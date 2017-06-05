@@ -68,7 +68,7 @@ async def on_whois_acct(event: 'RawEvent'):
 
 @raw('PING')
 async def do_ping(event: 'RawEvent'):
-    event.conn.send('PING', *event.irc_paramlist)
+    event.conn.send('PONG', *event.irc_paramlist)
 
 
 @raw('NOTICE')
