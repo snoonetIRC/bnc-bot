@@ -5,7 +5,7 @@ import os
 import random
 import ssl
 from fnmatch import fnmatch
-from typing import List, Optional
+from typing import List, Optional, Counter
 
 from bncbot import irc, util
 
@@ -26,7 +26,6 @@ class Conn(asyncio.Protocol):
         self._has_quit = False
         self.get_users_state = 0
         self.nick = None
-        self.commands = {}
         self.config = {}
 
     def load_config(self) -> None:
@@ -115,6 +114,16 @@ class Conn(asyncio.Protocol):
             del self.futures["bindhost"]
         self.save_data()
         self.load_data()
+        hosts = dict(filter(
+            lambda i: i[1] > 1,
+            Counter(self.bnc_users.values()).items()
+        ))
+        if hosts:
+            self.chan_log(
+                "WARNING: Duplicate BindHosts found: {}".format(
+                    ', '.join(hosts)
+                )
+            )
 
     async def connect(self) -> None:
         if self._has_quit:
@@ -208,10 +217,15 @@ class Conn(asyncio.Protocol):
         self.save_data()
 
     def get_bind_host(self) -> str:
-        while True:
+        for _ in range(50):
             host = f"127.0.{random.randint(1, 253)}.{random.randint(1, 253)}"
             if host not in self.bnc_users.values():
                 return host
+        else:
+            self.chan_log(
+                "ERROR: get_bind_host() has hit a bindhost collision"
+            )
+            raise ValueError
 
     def msg(self, target: str, *messages: str) -> None:
         for message in messages:

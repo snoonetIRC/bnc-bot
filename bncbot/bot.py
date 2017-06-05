@@ -110,7 +110,7 @@ async def on_privmsg(event: 'RawEvent'):
     elif message[0] == '.':
         cmd, _, text = message[1:].partition(' ')
         cmd_event = CommandEvent(base_event=event, command=cmd, text=text)
-        handler: Command = event.conn.handlers.get('command', {}).get(cmd)
+        handler: Command = conn.handlers.get('command', {}).get(cmd)
         if (handler and (not handler.admin or conn.is_admin(event.mask)) and
                 (not handler.param or text)):
             await handler.func(cmd_event)
