@@ -5,6 +5,7 @@ import os
 import random
 import ssl
 from fnmatch import fnmatch
+from operator import itemgetter
 from typing import List, Optional, Counter
 
 from bncbot import irc, util
@@ -114,10 +115,10 @@ class Conn(asyncio.Protocol):
             del self.futures["bindhost"]
         self.save_data()
         self.load_data()
-        hosts = dict(filter(
+        hosts = list(map(itemgetter(0), filter(
             lambda i: i[1] > 1,
             Counter(self.bnc_users.values()).items()
-        ))
+        )))
         if hosts:
             self.chan_log(
                 "WARNING: Duplicate BindHosts found: {}".format(
