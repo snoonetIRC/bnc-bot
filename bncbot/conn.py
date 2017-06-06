@@ -115,10 +115,10 @@ class Conn(asyncio.Protocol):
             del self.futures["bindhost"]
         self.save_data()
         self.load_data()
-        hosts = list(map(itemgetter(0), filter(
+        hosts = list(filter(None, map(itemgetter(0), filter(
             lambda i: i[1] > 1,
             Counter(self.bnc_users.values()).items()
-        )))
+        ))))
         if hosts:
             self.chan_log(
                 "WARNING: Duplicate BindHosts found: {}".format(
