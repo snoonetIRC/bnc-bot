@@ -223,6 +223,7 @@ def cmd_setadmin(text: str, bnc_users, message, conn: 'Conn'):
     acct = text.split()[0]
     if acct in bnc_users:
         conn.module_msg('controlpanel', f"Set Admin {acct} true")
+        conn.send("znc saveconfig")
         message(f"{acct} has been set as a BNC admin")
     else:
         message(f"{acct} does not exist as a BNC account")
