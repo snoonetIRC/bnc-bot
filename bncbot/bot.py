@@ -14,15 +14,12 @@ HANDLERS = {}
 
 def raw(*cmds):
     def _decorate(func):
-        if not cmds:
-            HANDLERS.setdefault('raw', {}).setdefault('', []).append(func)
-        for cmd in cmds:
+        for cmd in (cmds or ('',)):
             HANDLERS.setdefault('raw', {}).setdefault(cmd, []).append(func)
 
+    cmds = list(cmds)
     if len(cmds) == 1 and callable(cmds[0]):
-        func = cmds[0]
-        cmds = ()
-        return _decorate(func)
+        return _decorate(cmds.pop())
     return _decorate
 
 
@@ -124,14 +121,19 @@ async def on_nick(event: 'RawEvent'):
 @command("acceptbnc", admin=True)
 async def cmd_acceptbnc(event: 'CommandEvent'):
     nick = event.text.split(None, 1)[0]
+    conn = event.conn
     if nick not in event.bnc_queue:
         event.message(f"{nick} is not in the BNC queue.")
         return
-    event.conn.rem_queue(nick)
-    event.conn.add_user(nick)
-    event.conn.chan_log(
-        f"{nick} has been set with BNC access and memoserved credentials."
-    )
+    conn.rem_queue(nick)
+    if conn.add_user(nick):
+        conn.chan_log(
+            f"{nick} has been set with BNC access and memoserved credentials."
+        )
+    else:
+        conn.chan_log(
+            f"Error occurred when attempting to add {nick} to the BNC"
+        )
 
 
 @command("denybnc", admin=True)

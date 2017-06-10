@@ -6,7 +6,7 @@ import random
 import ssl
 from fnmatch import fnmatch
 from operator import itemgetter
-from typing import List, Optional, Counter
+from typing import List, Optional, Counter, Dict
 
 from bncbot import irc, util
 
@@ -196,9 +196,12 @@ class Conn(asyncio.Protocol):
         if self.log_chan:
             self.msg(self.log_chan, msg)
 
-    def add_user(self, nick: str) -> None:
+    def add_user(self, nick: str) -> bool:
         passwd = util.gen_pass()
-        host = self.get_bind_host()
+        try:
+            host = self.get_bind_host()
+        except ValueError:
+            return False
         self.module_msg('controlpanel', f"cloneuser BNCClient {nick}")
         self.module_msg('controlpanel', f"Set Password {nick} {passwd}")
         self.module_msg('controlpanel', f"Set BindHost {nick} {host}")
@@ -216,6 +219,7 @@ class Conn(asyncio.Protocol):
         )
         self.bnc_users[nick] = host
         self.save_data()
+        return True
 
     def get_bind_host(self) -> str:
         for _ in range(50):
@@ -237,11 +241,11 @@ class Conn(asyncio.Protocol):
         return self.config.get('admins', [])
 
     @property
-    def bnc_queue(self):
+    def bnc_queue(self) -> Dict[str, str]:
         return self.bnc_data.setdefault('queue', {})
 
     @property
-    def bnc_users(self):
+    def bnc_users(self) -> Dict[str, str]:
         return self.bnc_data.setdefault('users', {})
 
     @property

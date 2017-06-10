@@ -36,11 +36,11 @@ class Event:
 
     @property
     def bnc_queue(self):
-        return self.bnc_data.setdefault('queue', {})
+        return self.conn.bnc_queue
 
     @property
     def bnc_users(self):
-        return self.bnc_data.setdefault('users', {})
+        return self.conn.bnc_users
 
     @property
     def loop(self):
