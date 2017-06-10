@@ -203,8 +203,29 @@ async def cmd_resetpass(conn: 'Conn', text: str, bnc_users, message):
 
 
 @command("addbnc", "bncadd", admin=True)
-async def cmd_addbnc(event: 'CommandEvent'):
-    pass
+async def cmd_addbnc(text: str, conn: 'Conn', bnc_users, message):
+    acct = text.split()[0]
+    if acct in bnc_users:
+        message("A BNC account with that name already exists")
+    else:
+        if conn.add_user(acct):
+            conn.chan_log(
+                f"{acct} has been set with BNC access and memoserved credentials."
+            )
+        else:
+            conn.chan_log(
+                f"Error occurred when attempting to add {acct} to the BNC"
+            )
+
+
+@command("bncsetadmin", admin=True)
+def cmd_setadmin(text: str, bnc_users, message, conn: 'Conn'):
+    acct = text.split()[0]
+    if acct in bnc_users:
+        conn.module_msg('controlpanel', f"Set Admin {acct} true")
+        message(f"{acct} has been set as a BNC admin")
+    else:
+        message(f"{acct} does not exist as a BNC account")
 
 
 @command("requestbnc", "bncrequest", require_param=False)
