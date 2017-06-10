@@ -51,5 +51,5 @@ def make_event(conn: 'Conn', line: str) -> RawEvent:
 
     return RawEvent(
         conn=conn, nick=nick, user=user, host=host, mask=prefix, chan=chan,
-        irc_command=cmd, irc_paramlist=params
+        irc_rawline=line, irc_command=cmd, irc_paramlist=params
     )

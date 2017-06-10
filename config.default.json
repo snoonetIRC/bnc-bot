@@ -11,5 +11,6 @@
     "*!*@snoonet/owner/*",
     "*!*@snoonet/founder/*"
   ],
-  "log-channel": "##sysop"
+  "log_channel": "##sysop",
+  "command_prefix": "."
 }

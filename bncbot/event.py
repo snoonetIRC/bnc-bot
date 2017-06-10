@@ -43,29 +43,34 @@ class Event:
         return self.conn.bnc_users
 
     @property
+    def event(self):
+        return self
+
+    @property
     def loop(self):
         return self.conn.loop
 
 
 class RawEvent(Event):
     def __init__(self, *, conn: 'Conn' = None, base_event=None,
-                 nick: str = None,
-                 user: str = None, host: str = None, mask: str = None,
-                 chan: str = None, irc_command: str = None,
+                 nick: str = None, user: str = None, host: str = None,
+                 mask: str = None, chan: str = None, irc_rawline: str = None,
+                 irc_command: str = None,
                  irc_paramlist: List[str] = None) -> None:
         super().__init__(
             conn=conn, base_event=base_event, nick=nick, user=user, host=host,
             mask=mask, chan=chan
         )
+        self.irc_rawline = irc_rawline
         self.irc_command = irc_command
         self.irc_paramlist = irc_paramlist
 
 
 class CommandEvent(Event):
     def __init__(self, *, conn: 'Conn' = None, base_event=None,
-                 nick: str = None,
-                 user: str = None, host: str = None, mask: str = None,
-                 chan: str = None, command: str, text: str = None) -> None:
+                 nick: str = None, user: str = None, host: str = None,
+                 mask: str = None, chan: str = None, command: str,
+                 text: str = None) -> None:
         super().__init__(
             conn=conn, base_event=base_event, nick=nick, user=user, host=host,
             mask=mask, chan=chan

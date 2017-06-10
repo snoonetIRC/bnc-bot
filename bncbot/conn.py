@@ -1,6 +1,8 @@
 # coding=utf-8
 import asyncio
+import inspect
 import json
+import logging
 import os
 import random
 import ssl
@@ -178,7 +180,18 @@ class Conn(asyncio.Protocol):
         print(line)
         raw_event = irc.make_event(self, line)
         for handler in self.handlers.get('raw', {}).get('', []):
-            await handler(raw_event)
+            await self.launch_hook(raw_event, handler)
+
+    async def launch_hook(self, event, func) -> bool:
+        try:
+            params = [
+                getattr(event, name)
+                for name in inspect.signature(func).parameters.keys()
+            ]
+            await func(*params)
+        except Exception as e:
+            logging.exception("Error occured in hook")
+            return False
 
     def is_admin(self, mask: str) -> bool:
         return any(fnmatch(mask.lower(), pat.lower()) for pat in self.admins)
@@ -253,5 +266,9 @@ class Conn(asyncio.Protocol):
         return self.config.get('status_prefix', '*')
 
     @property
+    def cmd_prefix(self):
+        return self.config.get('command_prefix', '.')
+
+    @property
     def log_chan(self) -> Optional[str]:
-        return self.config.get('log-channel')
+        return self.config.get('log_channel')
