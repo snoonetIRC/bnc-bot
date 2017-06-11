@@ -230,7 +230,7 @@ def cmd_setadmin(text: str, bnc_users, message, conn: 'Conn'):
 
 
 @command("requestbnc", "bncrequest", require_param=False)
-async def cmd_requestbnc(nick: str, conn: 'Conn', message, bnc_users, loop):
+async def cmd_requestbnc(nick: str, conn: 'Conn', message, bnc_users, loop, bnc_queue):
     conn.futures['whois_acct_' + nick] = loop.create_future()
     conn.send("WHOIS", nick)
     acct = await conn.futures['whois_acct_' + nick]
@@ -242,8 +242,13 @@ async def cmd_requestbnc(nick: str, conn: 'Conn', message, bnc_users, loop):
         return
     if acct in bnc_users:
         message(
-            "It appears you already have a BNC account. If this is in error, "
-            "please contact staff in #help",
+            "It appears you already have a BNC account. If this is in error, please contact staff in #help",
+            nick
+        )
+        return
+    if acct in bnc_queue:
+        message(
+            "It appears you have already submitted a BNC request, If this is in error, please contact staff in #help",
             nick
         )
         return
