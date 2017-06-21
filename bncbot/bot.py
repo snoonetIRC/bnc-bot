@@ -12,6 +12,9 @@ if TYPE_CHECKING:
 
 
 class Command(NamedTuple):
+    """
+    A NamedTuple which represents a registered command
+    """
     name: str
     func: Callable
     admin: bool = False
@@ -22,6 +25,8 @@ HANDLERS = {}
 
 
 def raw(*cmds):
+    """Register a function as a handler for all raw commands in [cmds]"""
+
     def _decorate(func):
         for cmd in (cmds or ('',)):
             HANDLERS.setdefault('raw', {}).setdefault(cmd, []).append(func)
@@ -33,6 +38,8 @@ def raw(*cmds):
 
 
 def command(name, *aliases, admin=False, require_param=True):
+    """Registers a function as a handler for a command"""
+
     def _decorate(func):
         cmd = Command(name, func, admin, require_param)
         HANDLERS.setdefault('command', {}).update({
@@ -75,6 +82,7 @@ async def do_ping(irc_paramlist: List[str], conn: 'Conn'):
 
 @raw('NOTICE')
 async def on_notice(irc_paramlist: List[str], conn: 'Conn', nick: str):
+    """Handle NickServ info responses"""
     message = irc_paramlist[-1]
     if nick.lower() == "nickserv" and ':' in message:
         # Registered: May 30 00:53:54 2017 UTC (5 days, 19 minutes ago)

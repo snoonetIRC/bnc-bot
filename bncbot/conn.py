@@ -36,6 +36,7 @@ class Conn(asyncio.Protocol):
             self.config = json.load(f)
 
     def load_data(self, update: bool = False) -> None:
+        """Load cached BNC information from the file"""
         self.bnc_data = {}
         if os.path.exists('bnc.json'):
             with open('bnc.json') as f:
@@ -60,6 +61,7 @@ class Conn(asyncio.Protocol):
         return restart
 
     async def data_check(self) -> None:
+        """update the BNC cached data every ~8 hours"""
         while True:
             await asyncio.sleep(8 * 60 * 60, loop=self.loop)
             await self.get_user_hosts()
@@ -68,18 +70,21 @@ class Conn(asyncio.Protocol):
         asyncio.ensure_future(self.data_check(), loop=self.loop)
 
     def connection_made(self, transport) -> None:
+        """Called when the IRC connection is made"""
         self._transport = transport
         self.connected = True
         self._connected_future.set_result(None)
         del self._connected_future
 
     def connection_lost(self, exc) -> None:
+        """Called when the IRC connection is lost"""
         self._connected_future = self.loop.create_future()
         self.connected = False
         if exc is not None:
             asyncio.ensure_future(self.connect(), loop=self.loop)
 
     def eof_received(self) -> bool:
+        """Called when an EOF has been received from the IRC server"""
         self._connected_future = self.loop.create_future()
         self.connected = False
         asyncio.ensure_future(self.connect(), loop=self.loop)
