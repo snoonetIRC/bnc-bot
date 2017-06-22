@@ -2,8 +2,8 @@
 A bot to handle BNC account requests for Snoonet
 
 ## Designed for
-- [Anope](https://anope.org) IRC Services
-- [ZNC](https://znc.in) v2.0.5
+- [Anope](https://anope.org) IRC Services v2.0.5
+- [ZNC](https://znc.in) v1.6.5
 - [InspIRCd](https://inspircd.org) with the `m_services_account` module
 This bot may work with other systems, but this is the setup it was specifically written to work with
 
