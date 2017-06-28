@@ -111,7 +111,7 @@ class Conn:
         ]
         self._protocol = IrcProtocol(servers, "bnc", loop=self.loop)
         self._protocol.register('*', self.handle_line)
-        self._protocol.connect()
+        await self._protocol.connect()
 
     def close(self) -> None:
         self._protocol.quit()
