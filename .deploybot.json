@@ -14,7 +14,7 @@
     ],
     "file-deploy": true,
     "script": [
-      "[ -f .bncbot.pid ] && cat .bncbot.pid | xargs kill -SIGINT"
+      "[ -f .bncbot.pid ] && cat .bncbot.pid | xargs kill -SIGHUP"
     ],
     "match_files": [
       "bncbot/*"
@@ -36,7 +36,7 @@
     "file-deploy": true,
     "script": [
       "venv/bin/pip install -U -r requirements.txt",
-      "[ -f .bncbot.pid ] && cat .bncbot.pid | xargs kill -SIGINT"
+      "[ -f .bncbot.pid ] && cat .bncbot.pid | xargs kill -SIGHUP"
     ],
     "match_files": [
       "requirements.txt"
