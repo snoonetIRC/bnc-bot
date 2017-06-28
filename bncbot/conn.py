@@ -60,16 +60,25 @@ class Conn:
                     "level": "INFO",
                     "encoding": "utf-8",
                     "filename": os.path.join(self.log_dir, "bot.log")
+                },
+                "debug_file": {
+                    "class": "logging.handlers.RotatingFileHandler",
+                    "maxBytes": 1000000,
+                    "backupCount": 5,
+                    "formatter": "full",
+                    "encoding": "utf-8",
+                    "level": "DEBUG",
+                    "filename": os.path.join(self.log_dir, "debug.log")
                 }
             },
             "loggers": {
                 "bncbot": {
                     "level": "DEBUG",
-                    "handlers": ["console"]
+                    "handlers": ["console", "file"]
                 },
                 "asyncio": {
                     "level": "DEBUG",
-                    "handlers": ["console"]
+                    "handlers": ["console", "debug_file"]
                 }
             }
         })
