@@ -4,7 +4,6 @@ import os
 import signal
 import sys
 import time
-from functools import partial
 
 # store the original working directory, for use when restarting
 original_wd = os.path.realpath(".")
@@ -30,15 +29,14 @@ def main():
     def handle_sig(sig, frame):
         if sig == signal.SIGINT:
             if conn:
-                conn.loop.call_soon_threadsafe(
-                    partial(
-                        asyncio.ensure_future, conn.shutdown(True),
-                        loop=conn.loop
-                    )
-                )
+                asyncio.run_coroutine_threadsafe(conn.shutdown(), conn.loop)
             signal.signal(signal.SIGINT, original_sigint)
+        elif sig == signal.SIGHUP:
+            if conn:
+                asyncio.run_coroutine_threadsafe(conn.shutdown(True), conn.loop)
 
     signal.signal(signal.SIGINT, handle_sig)
+    signal.signal(signal.SIGHUP, handle_sig)
     restart = conn.run()
     if restart:
         conn = None
