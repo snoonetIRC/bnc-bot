@@ -106,7 +106,7 @@ class Conn:
     async def connect(self) -> None:
         servers = [
             Server(
-                self.config['server'], self.config['port'], self.config.get('ssl', False), self.config['password']
+                self.config['server'], self.config['port'], self.config.get('ssl', False), self.config['pass']
             )
         ]
         self._protocol = IrcProtocol(servers, "bnc", loop=self.loop)
