@@ -3,6 +3,7 @@ import asyncio
 import inspect
 import json
 import logging
+import logging.config
 import os
 import random
 from fnmatch import fnmatch
@@ -30,6 +31,49 @@ class Conn:
         self.get_users_state = 0
         self.nick = None
         self.config = {}
+        if not os.path.exists(self.log_dir):
+            os.makedirs(self.log_dir)
+        logging.config.dictConfig({
+            "version": 1,
+            "formatters": {
+                "brief": {
+                    "format": "[%(asctime)s] [%(levelname)s] %(message)s",
+                    "datefmt": "%H:%M:%S"
+                },
+                "full": {
+                    "format": "[%(asctime)s] [%(levelname)s] %(message)s",
+                    "datefmt": "%Y-%m-%d][%H:%M:%S"
+                }
+            },
+            "handlers": {
+                "console": {
+                    "class": "logging.StreamHandler",
+                    "formatter": "brief",
+                    "level": "DEBUG",
+                    "stream": "ext://sys.stdout"
+                },
+                "file": {
+                    "class": "logging.handlers.RotatingFileHandler",
+                    "maxBytes": 1000000,
+                    "backupCount": 5,
+                    "formatter": "full",
+                    "level": "INFO",
+                    "encoding": "utf-8",
+                    "filename": os.path.join(self.log_dir, "bot.log")
+                }
+            },
+            "loggers": {
+                "bncbot": {
+                    "level": "DEBUG",
+                    "handlers": ["console"]
+                },
+                "asyncio": {
+                    "level": "DEBUG",
+                    "handlers": ["console"]
+                }
+            }
+        })
+        self.logger = logging.getLogger("bncbot")
 
     def load_config(self) -> None:
         with open('config.json') as f:
@@ -70,9 +114,7 @@ class Conn:
         asyncio.ensure_future(self.data_check(), loop=self.loop)
 
     def send(self, *parts) -> None:
-        line = ' '.join(parts)
-        print('>> ', line)
-        self._protocol.send(line)
+        self._protocol.send(' '.join(parts))
 
     def module_msg(self, name: str, cmd: str) -> None:
         self.msg(self.prefix + name, cmd)
@@ -109,7 +151,9 @@ class Conn:
                 self.config['server'], self.config['port'], self.config.get('ssl', False), self.config['pass']
             )
         ]
-        self._protocol = IrcProtocol(servers, "bnc", loop=self.loop)
+        self._protocol = IrcProtocol(
+            servers, "bnc", user=self.config['user'], loop=self.loop, logger=self.logger
+        )
         self._protocol.register('*', self.handle_line)
         await self._protocol.connect()
 
@@ -122,7 +166,6 @@ class Conn:
         self.stopped_future.set_result(restart)
 
     async def handle_line(self, proto: 'IrcProtocol', line: 'Message') -> None:
-        print(line)
         raw_event = irc.make_event(self, line, proto)
         for handler in self.handlers.get('raw', {}).get('', []):
             await self.launch_hook(raw_event, handler)
@@ -135,7 +178,7 @@ class Conn:
             ]
             await func(*params)
         except Exception as e:
-            logging.exception("Error occured in hook")
+            self.logger.exception("Error occurred in hook")
             return False
 
     def is_admin(self, mask: str) -> bool:
@@ -217,3 +260,7 @@ class Conn:
     @property
     def log_chan(self) -> Optional[str]:
         return self.config.get('log_channel')
+
+    @property
+    def log_dir(self):
+        return "logs"
