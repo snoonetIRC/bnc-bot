@@ -5,28 +5,28 @@ import json
 import logging
 import os
 import random
-import ssl
 from fnmatch import fnmatch
 from operator import itemgetter
-from typing import List, Optional, Counter, Dict
+from typing import List, Optional, Counter, Dict, TYPE_CHECKING
+
+from asyncirc.protocol import IrcProtocol
+from asyncirc.server import Server
 
 from bncbot import irc, util
 
+if TYPE_CHECKING:
+    from asyncirc.irc import Message
 
-class Conn(asyncio.Protocol):
+
+class Conn:
     def __init__(self, handlers) -> None:
+        self._protocol = None
         self.handlers = handlers
         self.futures = {}
         self.locks = {}
         self.loop = asyncio.get_event_loop()
-        self._connected_future = self.loop.create_future()
-        self._transport = None
-        self._protocol = None
         self.bnc_data = {}
         self.stopped_future = self.loop.create_future()
-        self.buff = b''
-        self.connected = False
-        self._has_quit = False
         self.get_users_state = 0
         self.nick = None
         self.config = {}
@@ -69,40 +69,10 @@ class Conn(asyncio.Protocol):
     def start_timers(self) -> None:
         asyncio.ensure_future(self.data_check(), loop=self.loop)
 
-    def connection_made(self, transport) -> None:
-        """Called when the IRC connection is made"""
-        self._transport = transport
-        self.connected = True
-        self._connected_future.set_result(None)
-        del self._connected_future
-
-    def connection_lost(self, exc) -> None:
-        """Called when the IRC connection is lost"""
-        self._connected_future = self.loop.create_future()
-        self.connected = False
-        if exc is not None:
-            asyncio.ensure_future(self.connect(), loop=self.loop)
-
-    def eof_received(self) -> bool:
-        """Called when an EOF has been received from the IRC server"""
-        self._connected_future = self.loop.create_future()
-        self.connected = False
-        asyncio.ensure_future(self.connect(), loop=self.loop)
-        return True
-
     def send(self, *parts) -> None:
-        self.loop.call_soon_threadsafe(self._send, ' '.join(parts))
-
-    def _send(self, line: str) -> None:
-        print(">>", line)
-        asyncio.ensure_future(self._send_final(line), loop=self.loop)
-
-    async def _send_final(self, line: str) -> None:
-        if not self.connected:
-            await self._connected_future
-        line += '\r\n'
-        data = line.encode(errors="replace")
-        self._transport.write(data)
+        line = ' '.join(parts)
+        print('>> ', line)
+        self._protocol.send(line)
 
     def module_msg(self, name: str, cmd: str) -> None:
         self.msg(self.prefix + name, cmd)
@@ -134,56 +104,26 @@ class Conn(asyncio.Protocol):
             )
 
     async def connect(self) -> None:
-        if self._has_quit:
-            self.close()
-            return
-
-        if self.connected:
-            self._transport.close()
-
-        ctx = None
-        if self.config.get('ssl'):
-            ctx = ssl.create_default_context()
-
-        self.connected = False
-        self._transport, self._protocol = await self.loop.create_connection(
-            lambda: self, host=self.config['server'], port=self.config['port'],
-            ssl=ctx
-        )
-        self.send("PASS", self.config['pass'])
-        self.send("NICK bnc")
-        self.send(
-            "USER", self.config.get('user', 'bnc'), "0", "*", ":realname"
-        )
-
-    def quit(self, reason: str = None) -> None:
-        if not self._has_quit:
-            self._has_quit = True
-            if reason:
-                self.send("QUIT", reason)
-            else:
-                self.send("QUIT")
+        servers = [
+            Server(
+                self.config['server'], self.config['port'], self.config.get('ssl', False), self.config['password']
+            )
+        ]
+        self._protocol = IrcProtocol(servers, "bnc", loop=self.loop)
+        self._protocol.register('*', self.handle_line)
+        self._protocol.connect()
 
     def close(self) -> None:
-        self.quit()
-        if self.connected:
-            self._transport.close()
+        self._protocol.quit()
 
     async def shutdown(self, restart=False):
         self.close()
         await asyncio.sleep(1, loop=self.loop)
         self.stopped_future.set_result(restart)
 
-    def data_received(self, data: bytes) -> None:
-        self.buff += data
-        while b'\r\n' in self.buff:
-            raw_line, self.buff = self.buff.split(b'\r\n', 1)
-            line = raw_line.decode()
-            asyncio.ensure_future(self.handle_line(line), loop=self.loop)
-
-    async def handle_line(self, line: str) -> None:
+    async def handle_line(self, proto: 'IrcProtocol', line: 'Message') -> None:
         print(line)
-        raw_event = irc.make_event(self, line)
+        raw_event = irc.make_event(self, line, proto)
         for handler in self.handlers.get('raw', {}).get('', []):
             await self.launch_hook(raw_event, handler)
 

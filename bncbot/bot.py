@@ -75,11 +75,6 @@ async def on_whois_acct(conn: 'Conn', irc_paramlist: List[str]):
             del conn.futures['whois_acct_' + irc_paramlist[1]]
 
 
-@raw('PING')
-async def do_ping(irc_paramlist: List[str], conn: 'Conn'):
-    conn.send('PONG', *irc_paramlist)
-
-
 @raw('NOTICE')
 async def on_notice(irc_paramlist: List[str], conn: 'Conn', nick: str):
     """Handle NickServ info responses"""

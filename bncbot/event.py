@@ -1,7 +1,8 @@
 # coding=utf-8
-from typing import List, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from asyncirc.irc import ParamList, Message
     from bncbot.conn import Conn
 
 
@@ -54,9 +55,8 @@ class Event:
 class RawEvent(Event):
     def __init__(self, *, conn: 'Conn' = None, base_event=None,
                  nick: str = None, user: str = None, host: str = None,
-                 mask: str = None, chan: str = None, irc_rawline: str = None,
-                 irc_command: str = None,
-                 irc_paramlist: List[str] = None) -> None:
+                 mask: str = None, chan: str = None, irc_rawline: 'Message' = None,
+                 irc_command: str = None, irc_paramlist: 'ParamList' = None) -> None:
         super().__init__(
             conn=conn, base_event=base_event, nick=nick, user=user, host=host,
             mask=mask, chan=chan
