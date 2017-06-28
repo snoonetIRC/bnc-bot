@@ -51,6 +51,7 @@ def command(name, *aliases, admin=False, require_param=True):
 
 @raw
 async def on_raw(conn: 'Conn', event: 'RawEvent', irc_command: str):
+    conn.logger.info('[incoming] %s', event.irc_rawline)
     for handler in conn.handlers.get('raw', {}).get(irc_command, []):
         await conn.launch_hook(event, handler)
 
