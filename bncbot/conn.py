@@ -3,33 +3,86 @@ import asyncio
 import inspect
 import json
 import logging
+import logging.config
 import os
 import random
-import ssl
 from fnmatch import fnmatch
 from operator import itemgetter
-from typing import List, Optional, Counter, Dict
+from typing import List, Optional, Counter, Dict, TYPE_CHECKING
+
+from asyncirc.protocol import IrcProtocol
+from asyncirc.server import Server
 
 from bncbot import irc, util
 
+if TYPE_CHECKING:
+    from asyncirc.irc import Message
 
-class Conn(asyncio.Protocol):
+
+class Conn:
     def __init__(self, handlers) -> None:
+        self._protocol = None
         self.handlers = handlers
         self.futures = {}
         self.locks = {}
         self.loop = asyncio.get_event_loop()
-        self._connected_future = self.loop.create_future()
-        self._transport = None
-        self._protocol = None
         self.bnc_data = {}
         self.stopped_future = self.loop.create_future()
-        self.buff = b''
-        self.connected = False
-        self._has_quit = False
         self.get_users_state = 0
         self.nick = None
         self.config = {}
+        if not os.path.exists(self.log_dir):
+            os.makedirs(self.log_dir)
+        logging.config.dictConfig({
+            "version": 1,
+            "formatters": {
+                "brief": {
+                    "format": "[%(asctime)s] [%(levelname)s] %(message)s",
+                    "datefmt": "%H:%M:%S"
+                },
+                "full": {
+                    "format": "[%(asctime)s] [%(levelname)s] %(message)s",
+                    "datefmt": "%Y-%m-%d][%H:%M:%S"
+                }
+            },
+            "handlers": {
+                "console": {
+                    "class": "logging.StreamHandler",
+                    "formatter": "brief",
+                    "level": "DEBUG",
+                    "stream": "ext://sys.stdout"
+                },
+                "file": {
+                    "class": "logging.handlers.RotatingFileHandler",
+                    "maxBytes": 1000000,
+                    "backupCount": 5,
+                    "formatter": "full",
+                    "level": "INFO",
+                    "encoding": "utf-8",
+                    "filename": os.path.join(self.log_dir, "bot.log")
+                },
+                "debug_file": {
+                    "class": "logging.handlers.RotatingFileHandler",
+                    "maxBytes": 1000000,
+                    "backupCount": 5,
+                    "formatter": "full",
+                    "encoding": "utf-8",
+                    "level": "DEBUG",
+                    "filename": os.path.join(self.log_dir, "debug.log")
+                }
+            },
+            "loggers": {
+                "bncbot": {
+                    "level": "DEBUG",
+                    "handlers": ["console", "file"]
+                },
+                "asyncio": {
+                    "level": "DEBUG",
+                    "handlers": ["console", "debug_file"]
+                }
+            }
+        })
+        self.logger = logging.getLogger("bncbot")
 
     def load_config(self) -> None:
         with open('config.json') as f:
@@ -69,40 +122,8 @@ class Conn(asyncio.Protocol):
     def start_timers(self) -> None:
         asyncio.ensure_future(self.data_check(), loop=self.loop)
 
-    def connection_made(self, transport) -> None:
-        """Called when the IRC connection is made"""
-        self._transport = transport
-        self.connected = True
-        self._connected_future.set_result(None)
-        del self._connected_future
-
-    def connection_lost(self, exc) -> None:
-        """Called when the IRC connection is lost"""
-        self._connected_future = self.loop.create_future()
-        self.connected = False
-        if exc is not None:
-            asyncio.ensure_future(self.connect(), loop=self.loop)
-
-    def eof_received(self) -> bool:
-        """Called when an EOF has been received from the IRC server"""
-        self._connected_future = self.loop.create_future()
-        self.connected = False
-        asyncio.ensure_future(self.connect(), loop=self.loop)
-        return True
-
     def send(self, *parts) -> None:
-        self.loop.call_soon_threadsafe(self._send, ' '.join(parts))
-
-    def _send(self, line: str) -> None:
-        print(">>", line)
-        asyncio.ensure_future(self._send_final(line), loop=self.loop)
-
-    async def _send_final(self, line: str) -> None:
-        if not self.connected:
-            await self._connected_future
-        line += '\r\n'
-        data = line.encode(errors="replace")
-        self._transport.write(data)
+        self._protocol.send(' '.join(parts))
 
     def module_msg(self, name: str, cmd: str) -> None:
         self.msg(self.prefix + name, cmd)
@@ -134,56 +155,27 @@ class Conn(asyncio.Protocol):
             )
 
     async def connect(self) -> None:
-        if self._has_quit:
-            self.close()
-            return
-
-        if self.connected:
-            self._transport.close()
-
-        ctx = None
-        if self.config.get('ssl'):
-            ctx = ssl.create_default_context()
-
-        self.connected = False
-        self._transport, self._protocol = await self.loop.create_connection(
-            lambda: self, host=self.config['server'], port=self.config['port'],
-            ssl=ctx
+        servers = [
+            Server(
+                self.config['server'], self.config['port'], self.config.get('ssl', False), self.config['pass']
+            )
+        ]
+        self._protocol = IrcProtocol(
+            servers, "bnc", user=self.config['user'], loop=self.loop, logger=self.logger
         )
-        self.send("PASS", self.config['pass'])
-        self.send("NICK bnc")
-        self.send(
-            "USER", self.config.get('user', 'bnc'), "0", "*", ":realname"
-        )
-
-    def quit(self, reason: str = None) -> None:
-        if not self._has_quit:
-            self._has_quit = True
-            if reason:
-                self.send("QUIT", reason)
-            else:
-                self.send("QUIT")
+        self._protocol.register('*', self.handle_line)
+        await self._protocol.connect()
 
     def close(self) -> None:
-        self.quit()
-        if self.connected:
-            self._transport.close()
+        self._protocol.quit()
 
     async def shutdown(self, restart=False):
         self.close()
         await asyncio.sleep(1, loop=self.loop)
         self.stopped_future.set_result(restart)
 
-    def data_received(self, data: bytes) -> None:
-        self.buff += data
-        while b'\r\n' in self.buff:
-            raw_line, self.buff = self.buff.split(b'\r\n', 1)
-            line = raw_line.decode()
-            asyncio.ensure_future(self.handle_line(line), loop=self.loop)
-
-    async def handle_line(self, line: str) -> None:
-        print(line)
-        raw_event = irc.make_event(self, line)
+    async def handle_line(self, proto: 'IrcProtocol', line: 'Message') -> None:
+        raw_event = irc.make_event(self, line, proto)
         for handler in self.handlers.get('raw', {}).get('', []):
             await self.launch_hook(raw_event, handler)
 
@@ -193,10 +185,16 @@ class Conn(asyncio.Protocol):
                 getattr(event, name)
                 for name in inspect.signature(func).parameters.keys()
             ]
-            await func(*params)
+            if asyncio.iscoroutine(func) or asyncio.iscoroutinefunction(func):
+                await func(*params)
+            else:
+                await self.loop.run_in_executor(None, func, *params)
         except Exception as e:
-            logging.exception("Error occured in hook")
+            self.logger.exception("Error occurred in hook")
+            self.chan_log(f"Error occurred in hook {func.__name__}: {e}")
             return False
+        else:
+            return True
 
     def is_admin(self, mask: str) -> bool:
         return any(fnmatch(mask.lower(), pat.lower()) for pat in self.admins)
@@ -254,6 +252,10 @@ class Conn(asyncio.Protocol):
         for message in messages:
             self.send(f"PRIVMSG {target} :{message}")
 
+    def notice(self, target: str, *messages: str) -> None:
+        for message in messages:
+            self.send(f"NOTICE {target} :{message}")
+
     @property
     def admins(self) -> List[str]:
         return self.config.get('admins', [])
@@ -277,3 +279,7 @@ class Conn(asyncio.Protocol):
     @property
     def log_chan(self) -> Optional[str]:
         return self.config.get('log_channel')
+
+    @property
+    def log_dir(self):
+        return "logs"

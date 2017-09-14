@@ -6,6 +6,7 @@ from typing import NamedTuple, Callable, TYPE_CHECKING, List
 
 from bncbot import util
 from bncbot.event import CommandEvent, RawEvent
+from bncbot.util import chunk_str
 
 if TYPE_CHECKING:
     from bncbot.conn import Conn
@@ -19,6 +20,7 @@ class Command(NamedTuple):
     func: Callable
     admin: bool = False
     param: bool = True
+    doc: str = None
 
 
 HANDLERS = {}
@@ -41,7 +43,11 @@ def command(name, *aliases, admin=False, require_param=True):
     """Registers a function as a handler for a command"""
 
     def _decorate(func):
-        cmd = Command(name, func, admin, require_param)
+        if func.__doc__:
+            doc = func.__doc__.strip().splitlines()[0].strip()
+        else:
+            doc = None
+        cmd = Command(name, func, admin, require_param, doc)
         HANDLERS.setdefault('command', {}).update({
             alias: cmd for alias in chain((name,), aliases)
         })
@@ -51,6 +57,7 @@ def command(name, *aliases, admin=False, require_param=True):
 
 @raw
 async def on_raw(conn: 'Conn', event: 'RawEvent', irc_command: str):
+    conn.logger.info('[incoming] %s', event.irc_rawline)
     for handler in conn.handlers.get('raw', {}).get(irc_command, []):
         await conn.launch_hook(event, handler)
 
@@ -75,11 +82,6 @@ async def on_whois_acct(conn: 'Conn', irc_paramlist: List[str]):
             del conn.futures['whois_acct_' + irc_paramlist[1]]
 
 
-@raw('PING')
-async def do_ping(irc_paramlist: List[str], conn: 'Conn'):
-    conn.send('PONG', *irc_paramlist)
-
-
 @raw('NOTICE')
 async def on_notice(irc_paramlist: List[str], conn: 'Conn', nick: str):
     """Handle NickServ info responses"""
@@ -95,7 +97,7 @@ async def on_notice(irc_paramlist: List[str], conn: 'Conn', nick: str):
 
 @raw('PRIVMSG')
 async def on_privmsg(event: 'RawEvent', irc_paramlist: List[str], conn: 'Conn',
-                     nick: str, host: str, bnc_users, mask: str):
+                     nick: str, host: str, bnc_users, is_admin: bool):
     message = irc_paramlist[-1]
     if nick.startswith(conn.prefix) and host == "znc.in":
         znc_module = nick[len(conn.prefix):]
@@ -116,20 +118,28 @@ async def on_privmsg(event: 'RawEvent', irc_paramlist: List[str], conn: 'Conn',
                 conn.futures['bindhost'].set_result(host.strip())
     elif message[0] in conn.cmd_prefix:
         cmd, _, text = message[1:].partition(' ')
-        cmd_event = CommandEvent(base_event=event, command=cmd, text=text)
+        text = text.strip()
         handler: Command = conn.handlers.get('command', {}).get(cmd)
-        if (handler and (not handler.admin or conn.is_admin(mask)) and
-                (not handler.param or text)):
-            await conn.launch_hook(cmd_event, handler.func)
+        cmd_event = CommandEvent(base_event=event, command=cmd, text=text, cmd_handler=handler)
+        if not handler or (handler.admin and not is_admin):
+            return
+
+        if handler.param and not text:
+            cmd_event.notice_doc()
+            return
+
+        await conn.launch_hook(cmd_event, handler.func)
 
 
 @raw('NICK')
-async def on_nick(conn: 'Conn', irc_paramlist: List[str]):
-    conn.nick = irc_paramlist[0]
+async def on_nick(conn: 'Conn', irc_paramlist: List[str], nick: str):
+    if nick.lower() == conn.nick.lower():
+        conn.nick = irc_paramlist[0]
 
 
 @command("acceptbnc", admin=True)
 async def cmd_acceptbnc(text: str, conn: 'Conn', bnc_queue, message):
+    """<user> - Accepts [user]'s BNC request and sends their login info via a MemoServ memo"""
     nick = text.split(None, 1)[0]
     if nick not in bnc_queue:
         message(f"{nick} is not in the BNC queue.")
@@ -147,6 +157,7 @@ async def cmd_acceptbnc(text: str, conn: 'Conn', bnc_queue, message):
 
 @command("denybnc", admin=True)
 async def cmd_denybnc(text: str, message, bnc_queue, conn: 'Conn'):
+    """<user> - Deny [user]'s BNC request"""
     nick = text.split()[0]
     if nick not in bnc_queue:
         message(f"{nick} is not in the BNC queue.")
@@ -161,6 +172,7 @@ async def cmd_denybnc(text: str, message, bnc_queue, conn: 'Conn'):
 
 @command("bncrefresh", admin=True, require_param=False)
 async def cmd_bncrefresh(conn: 'Conn', message, nick: str):
+    """- Refresh BNC account data (Warning: operation is slow)"""
     message("Updating user list")
     conn.chan_log(f"{nick} is updating the BNC user list...")
     await conn.get_user_hosts()
@@ -169,6 +181,7 @@ async def cmd_bncrefresh(conn: 'Conn', message, nick: str):
 
 @command("bncqueue", "bncq", admin=True, require_param=False)
 async def cmd_bncqueue(bnc_queue, message):
+    """- View the current BNC queue"""
     if bnc_queue:
         for nick, reg_time in bnc_queue.items():
             message(f"BNC Queue: {nick} Registered {reg_time}")
@@ -179,6 +192,7 @@ async def cmd_bncqueue(bnc_queue, message):
 @command("delbnc", admin=True)
 async def cmd_delbnc(text: str, conn: 'Conn', bnc_users, chan: str, message,
                      nick: str):
+    """<user> - Delete [user]'s BNC account"""
     acct = text.split()[0]
     if acct not in bnc_users:
         message(f"{acct} is not a current BNC user")
@@ -194,6 +208,7 @@ async def cmd_delbnc(text: str, conn: 'Conn', bnc_users, chan: str, message,
 
 @command("bncresetpass", admin=True)
 async def cmd_resetpass(conn: 'Conn', text: str, bnc_users, message):
+    """<user> - Resets [user]'s BNC account password and sends them the new info in a MemoServ memo"""
     nick = text.split()[0]
     if nick not in bnc_users:
         message(f"{nick} is not a BNC user.")
@@ -212,6 +227,7 @@ async def cmd_resetpass(conn: 'Conn', text: str, bnc_users, message):
 
 @command("addbnc", "bncadd", admin=True)
 async def cmd_addbnc(text: str, conn: 'Conn', bnc_users, message):
+    """<user> - Add a BNC account for [user] and MemoServ [user] the login credentials"""
     acct = text.split()[0]
     if acct in bnc_users:
         message("A BNC account with that name already exists")
@@ -227,7 +243,8 @@ async def cmd_addbnc(text: str, conn: 'Conn', bnc_users, message):
 
 
 @command("bncsetadmin", admin=True)
-def cmd_setadmin(text: str, bnc_users, message, conn: 'Conn'):
+async def cmd_setadmin(text: str, bnc_users, message, conn: 'Conn'):
+    """<user> - Makes [user] a BNC admin"""
     acct = text.split()[0]
     if acct in bnc_users:
         conn.module_msg('controlpanel', f"Set Admin {acct} true")
@@ -239,12 +256,13 @@ def cmd_setadmin(text: str, bnc_users, message, conn: 'Conn'):
 
 @command("requestbnc", "bncrequest", require_param=False)
 async def cmd_requestbnc(nick: str, conn: 'Conn', message, bnc_users, loop, bnc_queue):
+    """- Submits a request for a BNC account"""
     conn.futures['whois_acct_' + nick] = loop.create_future()
     conn.send("WHOIS", nick)
     acct = await conn.futures['whois_acct_' + nick]
     if not acct:
         message(
-            f"You must be identified with services to request a BNC account",
+            "You must be identified with services to request a BNC account",
             nick
         )
         return
@@ -256,7 +274,7 @@ async def cmd_requestbnc(nick: str, conn: 'Conn', message, bnc_users, loop, bnc_
         return
     if acct in bnc_queue:
         message(
-            "It appears you have already submitted a BNC request, If this is in error, please contact staff in #help",
+            "It appears you have already submitted a BNC request. If this is in error, please contact staff in #help",
             nick
         )
         return
@@ -276,9 +294,38 @@ async def cmd_requestbnc(nick: str, conn: 'Conn', message, bnc_users, loop, bnc_
 
 @command("genbindhost", require_param=False, admin=True)
 async def cmd_genbindhost(conn: 'Conn', message):
+    """- Generate a unique bind host and return it"""
     try:
-        host = conn.get_bind_host()
+        out = conn.get_bind_host()
     except ValueError:
-        message("Unable to generate unique bindhost")
+        out = "Unable to generate unique bindhost"
+
+    message(out)
+
+
+@command("help", require_param=False)
+async def cmd_help(notice, text: str, is_admin: bool):
+    """[command] - Display help for [command] or list all commands if none is specified"""
+    if not text:
+        # no param, display all available commands
+        cmds = HANDLERS.get('command', {}).items()
+        aliases = list(
+            alias for alias, cmd in cmds
+            if not cmd.admin or is_admin
+        )
+        aliases.sort()
+        msg = f"Available Commands: {', '.join(aliases)}"
+        for chunk in chunk_str(msg):
+            notice(chunk)
+        notice("For detailed help about a command, use 'help <command>'")
     else:
-        message(host)
+        cmd = HANDLERS.get('command', {}).get(text.lower())
+        if not cmd or (cmd.admin and not is_admin):
+            message = "No such command."
+        else:
+            if not cmd.doc:
+                message = f"Command '{text}' has no additional documentation."
+            else:
+                message = f"{text} {cmd.doc}"
+
+        notice(message)
