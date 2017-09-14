@@ -272,3 +272,13 @@ async def cmd_requestbnc(nick: str, conn: 'Conn', message, bnc_users, loop, bnc_
     conn.chan_log(
         f"{acct} added to bnc queue. Registered {registered_time}"
     )
+
+
+@command("genbindhost", require_param=False, admin=True)
+async def cmd_genbindhost(conn: 'Conn', message):
+    try:
+        host = conn.get_bind_host()
+    except ValueError:
+        message("Unable to generate unique bindhost")
+    else:
+        message(host)
