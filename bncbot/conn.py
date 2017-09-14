@@ -29,7 +29,6 @@ class Conn:
         self.bnc_data = {}
         self.stopped_future = self.loop.create_future()
         self.get_users_state = 0
-        self.nick = None
         self.config = {}
         if not os.path.exists(self.log_dir):
             os.makedirs(self.log_dir)
@@ -283,3 +282,11 @@ class Conn:
     @property
     def log_dir(self):
         return "logs"
+
+    @property
+    def nick(self) -> str:
+        return self._protocol.nick
+
+    @nick.setter
+    def nick(self, value: str) -> None:
+        self._protocol.nick = value
