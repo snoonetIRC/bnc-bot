@@ -188,6 +188,7 @@ class Conn:
             await func(*params)
         except Exception as e:
             self.logger.exception("Error occurred in hook")
+            self.chan_log(f"Error occurred in hook {func.__name__}: {e}")
             return False
 
     def is_admin(self, mask: str) -> bool:
