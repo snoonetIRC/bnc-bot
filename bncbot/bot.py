@@ -6,6 +6,7 @@ from typing import NamedTuple, Callable, TYPE_CHECKING, List
 
 from bncbot import util
 from bncbot.event import CommandEvent, RawEvent
+from bncbot.util import chunk_str
 
 if TYPE_CHECKING:
     from bncbot.conn import Conn
@@ -96,7 +97,7 @@ async def on_notice(irc_paramlist: List[str], conn: 'Conn', nick: str):
 
 @raw('PRIVMSG')
 async def on_privmsg(event: 'RawEvent', irc_paramlist: List[str], conn: 'Conn',
-                     nick: str, host: str, bnc_users, mask: str):
+                     nick: str, host: str, bnc_users, is_admin: bool):
     message = irc_paramlist[-1]
     if nick.startswith(conn.prefix) and host == "znc.in":
         znc_module = nick[len(conn.prefix):]
@@ -120,7 +121,7 @@ async def on_privmsg(event: 'RawEvent', irc_paramlist: List[str], conn: 'Conn',
         text = text.strip()
         handler: Command = conn.handlers.get('command', {}).get(cmd)
         cmd_event = CommandEvent(base_event=event, command=cmd, text=text, cmd_handler=handler)
-        if not handler or (handler.admin and not conn.is_admin(mask)):
+        if not handler or (handler.admin and not is_admin):
             return
 
         if handler.param and not text:
@@ -131,8 +132,9 @@ async def on_privmsg(event: 'RawEvent', irc_paramlist: List[str], conn: 'Conn',
 
 
 @raw('NICK')
-async def on_nick(conn: 'Conn', irc_paramlist: List[str]):
-    conn.nick = irc_paramlist[0]
+async def on_nick(conn: 'Conn', irc_paramlist: List[str], nick: str):
+    if nick.lower() == conn.nick.lower():
+        conn.nick = irc_paramlist[0]
 
 
 @command("acceptbnc", admin=True)
@@ -302,16 +304,18 @@ async def cmd_genbindhost(conn: 'Conn', message):
 
 
 @command("help", require_param=False)
-async def cmd_help(conn: 'Conn', notice, mask: str, text: str):
+async def cmd_help(notice, text: str, is_admin: bool):
     """[command] - Display help for [command] or list all commands if none is specified"""
-    is_admin = conn.is_admin(mask)
     if not text:
         # no param, display all available commands
-        aliases = list(alias for alias, cmd in HANDLERS.get('command', {}).items() if not cmd.admin or is_admin)
+        cmds = HANDLERS.get('command', {}).items()
+        aliases = list(
+            alias for alias, cmd in cmds
+            if not cmd.admin or is_admin
+        )
         aliases.sort()
         msg = f"Available Commands: {', '.join(aliases)}"
-        chunks = (msg[i: i + 256] for i in range(0, len(msg), 256))
-        for chunk in chunks:
+        for chunk in chunk_str(msg):
             notice(chunk)
         notice("For detailed help about a command, use 'help <command>'")
     else:
