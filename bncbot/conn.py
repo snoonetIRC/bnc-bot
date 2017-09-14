@@ -271,7 +271,7 @@ class Conn:
             f"{passwd} (Ports: 5457 for SSL - 5456 for NON-SSL) Help: "
             f"/server bnc.snoonet.org 5456 and /PASS {username}:{passwd}"
         )
-        self.bnc_users[nick] = host
+        self.bnc_users[username] = host
         self.save_data()
         return True
 
