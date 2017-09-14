@@ -266,7 +266,11 @@ async def cmd_requestbnc(nick: str, conn: 'Conn', message, bnc_users, loop, bnc_
             nick
         )
         return
-    if acct in bnc_users:
+    username = acct
+    if not conn.is_valid_username(username):
+        username = conn.sanitize_username(username)
+
+    if username in bnc_users:
         message(
             "It appears you already have a BNC account. If this is in error, please contact staff in #help",
             nick
