@@ -185,11 +185,16 @@ class Conn:
                 getattr(event, name)
                 for name in inspect.signature(func).parameters.keys()
             ]
-            await func(*params)
+            if asyncio.iscoroutine(func) or asyncio.iscoroutinefunction(func):
+                await func(*params)
+            else:
+                await self.loop.run_in_executor(None, func, *params)
         except Exception as e:
             self.logger.exception("Error occurred in hook")
             self.chan_log(f"Error occurred in hook {func.__name__}: {e}")
             return False
+        else:
+            return True
 
     def is_admin(self, mask: str) -> bool:
         return any(fnmatch(mask.lower(), pat.lower()) for pat in self.admins)
