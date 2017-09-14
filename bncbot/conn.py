@@ -1,11 +1,13 @@
 # coding=utf-8
 import asyncio
+import hashlib
 import inspect
 import json
 import logging
 import logging.config
 import os
 import random
+import string
 from fnmatch import fnmatch
 from operator import itemgetter
 from typing import List, Optional, Counter, Dict, TYPE_CHECKING
@@ -211,26 +213,63 @@ class Conn:
         if self.log_chan:
             self.msg(self.log_chan, msg)
 
+    def is_valid_username(self, name: str) -> bool:
+        if name[0] not in string.ascii_letters:
+            return False
+
+        for char in name:
+            if char not in self.valid_user_chars:
+                return False
+
+        return True
+
+    def sanitize_username(self, user: str) -> str:
+        new_user = ""
+        for c in user:
+            if c in self.valid_user_chars:
+                new_user += c
+            else:
+                new_user += '-'
+
+        m = hashlib.md5(user.encode())
+        md5hash = int.from_bytes(m.digest(), 'big')
+        chars = self.valid_user_chars
+        out = ""
+        while md5hash > len(chars):
+            md5hash, rem = divmod(md5hash, len(chars))
+            out += chars[rem]
+
+        out += chars[md5hash]
+        new_user += '@' + out[:8]
+        return new_user
+
     def add_user(self, nick: str) -> bool:
+        if not self.is_valid_username(nick):
+            username = self.sanitize_username(nick)
+            self.chan_log(f"WARNING: Invalid username '{nick}'; sanitizing to {username}")
+        else:
+            username = nick
+
         passwd = util.gen_pass()
         try:
             host = self.get_bind_host()
         except ValueError:
             return False
-        self.module_msg('controlpanel', f"cloneuser BNCClient {nick}")
-        self.module_msg('controlpanel', f"Set Password {nick} {passwd}")
-        self.module_msg('controlpanel', f"Set BindHost {nick} {host}")
-        self.module_msg('controlpanel', f"Set Nick {nick} {nick}")
-        self.module_msg('controlpanel', f"Set AltNick {nick} {nick}_")
-        self.module_msg('controlpanel', f"Set Ident {nick} {nick}")
-        self.module_msg('controlpanel', f"Set Realname {nick} {nick}")
+
+        self.module_msg('controlpanel', f"cloneuser BNCClient {username}")
+        self.module_msg('controlpanel', f"Set Password {username} {passwd}")
+        self.module_msg('controlpanel', f"Set BindHost {username} {host}")
+        self.module_msg('controlpanel', f"Set Nick {username} {nick}")
+        self.module_msg('controlpanel', f"Set AltNick {username} {nick}_")
+        self.module_msg('controlpanel', f"Set Ident {username} {nick}")
+        self.module_msg('controlpanel', f"Set Realname {username} {nick}")
         self.send('znc saveconfig')
-        self.module_msg('controlpanel', f"reconnect {nick} Snoonet")
+        self.module_msg('controlpanel', f"reconnect {username} Snoonet")
         self.msg(
             "MemoServ",
-            f"SEND {nick} Your BNC auth is Username: {nick} Password: "
+            f"SEND {nick} Your BNC auth is Username: {username} Password: "
             f"{passwd} (Ports: 5457 for SSL - 5456 for NON-SSL) Help: "
-            f"/server bnc.snoonet.org 5456 and /PASS {nick}:{passwd}"
+            f"/server bnc.snoonet.org 5456 and /PASS {username}:{passwd}"
         )
         self.bnc_users[nick] = host
         self.save_data()
@@ -290,3 +329,7 @@ class Conn:
     @nick.setter
     def nick(self, value: str) -> None:
         self._protocol.nick = value
+
+    @property
+    def valid_user_chars(self):
+        return string.ascii_letters + string.digits + "@.-_"

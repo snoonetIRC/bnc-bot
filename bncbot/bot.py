@@ -97,7 +97,7 @@ async def on_notice(irc_paramlist: List[str], conn: 'Conn', nick: str):
 
 @raw('PRIVMSG')
 async def on_privmsg(event: 'RawEvent', irc_paramlist: List[str], conn: 'Conn',
-                     nick: str, host: str, bnc_users, is_admin: bool):
+                     nick: str, host: str, bnc_users, is_admin: bool) -> None:
     message = irc_paramlist[-1]
     if nick.startswith(conn.prefix) and host == "znc.in":
         znc_module = nick[len(conn.prefix):]
