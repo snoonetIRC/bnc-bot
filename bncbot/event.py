@@ -59,6 +59,10 @@ class Event:
     def loop(self):
         return self.conn.loop
 
+    @property
+    def is_admin(self):
+        return self.conn.is_admin(self.mask)
+
 
 class RawEvent(Event):
     def __init__(self, *, conn: 'Conn' = None, base_event=None,
