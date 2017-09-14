@@ -252,6 +252,10 @@ class Conn:
         for message in messages:
             self.send(f"PRIVMSG {target} :{message}")
 
+    def notice(self, target: str, *messages: str) -> None:
+        for message in messages:
+            self.send(f"NOTICE {target} :{message}")
+
     @property
     def admins(self) -> List[str]:
         return self.config.get('admins', [])

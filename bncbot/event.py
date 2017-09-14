@@ -1,8 +1,10 @@
 # coding=utf-8
 from typing import TYPE_CHECKING
 
+
 if TYPE_CHECKING:
     from asyncirc.irc import ParamList, Message
+    from bncbot.bot import Command
     from bncbot.conn import Conn
 
 
@@ -30,6 +32,12 @@ class Event:
             assert self.chan
             target = self.chan
         self.conn.msg(target, message)
+
+    def notice(self, message: str, target: str = None) -> None:
+        if not target:
+            assert self.nick
+            target = self.nick
+        self.conn.notice(target, message)
 
     @property
     def bnc_data(self):
@@ -70,10 +78,21 @@ class CommandEvent(Event):
     def __init__(self, *, conn: 'Conn' = None, base_event=None,
                  nick: str = None, user: str = None, host: str = None,
                  mask: str = None, chan: str = None, command: str,
-                 text: str = None) -> None:
+                 text: str = None, cmd_handler: 'Command' = None) -> None:
         super().__init__(
             conn=conn, base_event=base_event, nick=nick, user=user, host=host,
             mask=mask, chan=chan
         )
         self.command = command
         self.text = text
+        self.cmd_handler = cmd_handler
+
+    def notice_doc(self):
+        if not self.cmd_handler.doc:
+            message = "{}{} requires additional arguments.".format(
+                self.conn.cmd_prefix, self.command
+            )
+        else:
+            message = "{}{} {}".format(self.conn.cmd_prefix, self.command, self.cmd_handler.doc)
+
+        self.notice(message)
