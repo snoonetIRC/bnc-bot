@@ -112,10 +112,12 @@ async def on_privmsg(event: 'RawEvent', irc_paramlist: List[str], conn: 'Conn',
                 conn.get_users_state += 1
                 if conn.get_users_state == 3:
                     conn.futures['user_list'].set_result(None)
-        elif znc_module == "controlpanel" and conn.futures.get('bindhost'):
-            if message.startswith("BindHost = "):
-                _, _, host = message.partition('=')
-                conn.futures['bindhost'].set_result(host.strip())
+        elif znc_module == "controlpanel" and conn.futures.get('bindhost') and message.startswith("BindHost = "):
+            _, _, host = message.partition('=')
+            conn.futures['bindhost'].set_result(host.strip())
+        elif znc_module == "controlpanel" and conn.futures.get("bncadmin") and message.startswith("Admin = "):
+            _, _, is_admin = message.partition('=')
+            conn.futures["bncadmin"].set_result(is_admin.strip() == "true")
     elif message[0] in conn.cmd_prefix:
         cmd, _, text = message[1:].partition(' ')
         text = text.strip()

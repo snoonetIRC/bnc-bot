@@ -8,6 +8,7 @@ import logging.config
 import os
 import random
 import string
+from collections import defaultdict
 from datetime import timedelta
 from fnmatch import fnmatch
 from operator import itemgetter
@@ -28,7 +29,7 @@ class Conn:
         self._protocol = None
         self.handlers = handlers
         self.futures = {}
-        self.locks = {}
+        self.locks = defaultdict(asyncio.Lock)
         self.loop = asyncio.get_event_loop()
         self.bnc_data = {}
         self.stopped_future = self.loop.create_future()
@@ -213,6 +214,16 @@ class Conn:
 
     def is_admin(self, mask: str) -> bool:
         return any(fnmatch(mask.lower(), pat.lower()) for pat in self.admins)
+
+    async def is_bnc_admin(self, name) -> bool:
+        lock = self.locks["controlpanel_bncadmin"]
+        async with lock:
+            fut = self.futures.setdefault("bncadmin", self.loop.create_future())
+            self.module_msg("controlpanel", "Get Admin {}".format(name))
+            res = await fut
+            del self.futures["bncadmin"]
+
+        return res
 
     def add_queue(self, nick: str, registered_time: str) -> None:
         self.bnc_queue[nick] = registered_time
