@@ -8,6 +8,7 @@ import logging.config
 import os
 import random
 import string
+from datetime import timedelta
 from fnmatch import fnmatch
 from operator import itemgetter
 from typing import List, Optional, Counter, Dict, TYPE_CHECKING
@@ -16,6 +17,7 @@ from asyncirc.protocol import IrcProtocol
 from asyncirc.server import Server
 
 from bncbot import irc, util
+from bncbot.async_util import call_func
 
 if TYPE_CHECKING:
     from asyncirc.irc import Message
@@ -114,14 +116,26 @@ class Conn:
         self.loop.stop()
         return restart
 
-    async def data_check(self) -> None:
-        """update the BNC cached data every ~8 hours"""
+    async def timer(self, interval, func, *args, initial_interval=None):
+        if initial_interval is None:
+            initial_interval = interval
+
+        if isinstance(interval, timedelta):
+            interval = interval.total_seconds()
+
+        if isinstance(initial_interval, timedelta):
+            initial_interval = initial_interval.total_seconds()
+
+        await asyncio.sleep(initial_interval)
         while True:
-            await asyncio.sleep(8 * 60 * 60, loop=self.loop)
-            await self.get_user_hosts()
+            await call_func(func, *args)
+            await asyncio.sleep(interval)
+
+    def create_timer(self, interval, func, *args, initial_interval=None):
+        asyncio.ensure_future(self.timer(interval, func, *args, initial_interval=initial_interval), loop=self.loop)
 
     def start_timers(self) -> None:
-        asyncio.ensure_future(self.data_check(), loop=self.loop)
+        self.create_timer(timedelta(hours=8), self.get_user_hosts)
 
     def send(self, *parts) -> None:
         self._protocol.send(' '.join(parts))
