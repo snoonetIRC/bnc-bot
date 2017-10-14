@@ -11,6 +11,7 @@ if TYPE_CHECKING:
 CMD_PARAMS = {
     'PRIVMSG': ('chan', 'msg'),
     'NOTICE': ('chan', 'msg'),
+    'JOIN': ('chan',),
 }
 
 
