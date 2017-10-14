@@ -1,17 +1,14 @@
 # coding=utf-8
 import asyncio
-import hashlib
 import inspect
 import json
 import logging
 import logging.config
-import os
-import random
-import string
 from collections import defaultdict
 from datetime import timedelta
 from fnmatch import fnmatch
 from operator import itemgetter
+from pathlib import Path
 from typing import List, Optional, Counter, Dict, TYPE_CHECKING
 
 from asyncirc.protocol import IrcProtocol
@@ -26,6 +23,7 @@ if TYPE_CHECKING:
 
 class Conn:
     def __init__(self, handlers) -> None:
+        self.run_dir = Path().resolve()
         self._protocol = None
         self.handlers = handlers
         self.futures = {}
@@ -35,8 +33,9 @@ class Conn:
         self.stopped_future = self.loop.create_future()
         self.get_users_state = 0
         self.config = {}
-        if not os.path.exists(self.log_dir):
-            os.makedirs(self.log_dir)
+        if not self.log_dir.exists():
+            self.log_dir.mkdir()
+
         logging.config.dictConfig({
             "version": 1,
             "formatters": {
@@ -63,7 +62,7 @@ class Conn:
                     "formatter": "full",
                     "level": "INFO",
                     "encoding": "utf-8",
-                    "filename": os.path.join(self.log_dir, "bot.log")
+                    "filename": self.log_dir / "bot.log"
                 },
                 "debug_file": {
                     "class": "logging.handlers.RotatingFileHandler",
@@ -72,7 +71,7 @@ class Conn:
                     "formatter": "full",
                     "encoding": "utf-8",
                     "level": "DEBUG",
-                    "filename": os.path.join(self.log_dir, "debug.log")
+                    "filename": self.log_dir / "debug.log"
                 }
             },
             "loggers": {
@@ -89,15 +88,16 @@ class Conn:
         self.logger = logging.getLogger("bncbot")
 
     def load_config(self) -> None:
-        with open('config.json') as f:
+        with self.config_file.open(encoding='utf8') as f:
             self.config = json.load(f)
 
     def load_data(self, update: bool = False) -> None:
         """Load cached BNC information from the file"""
         self.bnc_data = {}
-        if os.path.exists('bnc.json'):
-            with open('bnc.json') as f:
+        if self.data_file.exists():
+            with self.data_file.open(encoding='utf8') as f:
                 self.bnc_data = json.load(f)
+
         self.bnc_data.setdefault('queue', {})
         self.bnc_data.setdefault('users', {})
         self.save_data()
@@ -105,7 +105,7 @@ class Conn:
             asyncio.ensure_future(self.get_user_hosts(), loop=self.loop)
 
     def save_data(self) -> None:
-        with open('bnc.json', 'w') as f:
+        with self.data_file.open('w', encoding='utf8') as f:
             json.dump(self.bnc_data, f, indent=2, sort_keys=True)
 
     def run(self) -> bool:
@@ -148,15 +148,19 @@ class Conn:
         """Should only be run periodically to keep the user list in sync"""
         self.get_users_state = 0
         self.bnc_users.clear()
-        self.futures["user_list"] = self.loop.create_future()
+        user_list_fut = self.loop.create_future()
+        self.futures["user_list"] = user_list_fut
         self.send("znc listusers")
-        await self.futures["user_list"]
+        await user_list_fut
         del self.futures["user_list"]
+
         for user in self.bnc_users:
-            self.futures["bindhost"] = self.loop.create_future()
+            bindhost_fut = self.loop.create_future()
+            self.futures["bindhost"] = bindhost_fut
             self.module_msg("controlpanel", f"Get BindHost {user}")
-            self.bnc_users[user] = (await self.futures["bindhost"])
+            self.bnc_users[user] = bindhost_fut
             del self.futures["bindhost"]
+
         self.save_data()
         self.load_data()
         hosts = list(filter(None, map(itemgetter(0), filter(
@@ -312,7 +316,15 @@ class Conn:
 
     @property
     def log_dir(self):
-        return "logs"
+        return self.run_dir / "logs"
+
+    @property
+    def data_file(self):
+        return self.run_dir / "bnc.json"
+
+    @property
+    def config_file(self):
+        return self.run_dir / "config.json"
 
     @property
     def nick(self) -> str:
