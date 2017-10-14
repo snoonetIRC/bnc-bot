@@ -201,13 +201,10 @@ class Conn:
                 getattr(event, name)
                 for name in inspect.signature(func).parameters.keys()
             ]
-            if asyncio.iscoroutine(func) or asyncio.iscoroutinefunction(func):
-                await func(*params)
-            else:
-                await self.loop.run_in_executor(None, func, *params)
+            await call_func(func, *params)
         except Exception as e:
             self.logger.exception("Error occurred in hook")
-            self.chan_log(f"Error occurred in hook {func.__name__}: {e}")
+            self.chan_log(f"Error occurred in hook {func.__name__} '{type(e).__name__}: {e}'")
             return False
         else:
             return True
@@ -238,39 +235,9 @@ class Conn:
         if self.log_chan:
             self.msg(self.log_chan, msg)
 
-    def is_valid_username(self, name: str) -> bool:
-        if name[0] not in string.ascii_letters:
-            return False
-
-        for char in name:
-            if char not in self.valid_user_chars:
-                return False
-
-        return True
-
-    def sanitize_username(self, user: str) -> str:
-        new_user = ""
-        for c in user:
-            if c in self.valid_user_chars:
-                new_user += c
-            else:
-                new_user += '-'
-
-        m = hashlib.md5(user.encode())
-        md5hash = int.from_bytes(m.digest(), 'big')
-        chars = self.valid_user_chars
-        out = ""
-        while md5hash > len(chars):
-            md5hash, rem = divmod(md5hash, len(chars))
-            out += chars[rem]
-
-        out += chars[md5hash]
-        new_user += '@' + out[:8]
-        return new_user
-
     def add_user(self, nick: str) -> bool:
-        if not self.is_valid_username(nick):
-            username = self.sanitize_username(nick)
+        if not util.is_username_valid(nick):
+            username = util.sanitize_username(nick)
             self.chan_log(f"WARNING: Invalid username '{nick}'; sanitizing to {username}")
         else:
             username = nick
@@ -302,7 +269,7 @@ class Conn:
 
     def get_bind_host(self) -> str:
         for _ in range(50):
-            host = f"127.0.{random.randint(1, 253)}.{random.randint(1, 253)}"
+            host = str(util.gen_bindhost())
             if host not in self.bnc_users.values():
                 return host
         else:
@@ -354,7 +321,3 @@ class Conn:
     @nick.setter
     def nick(self, value: str) -> None:
         self._protocol.nick = value
-
-    @property
-    def valid_user_chars(self):
-        return string.ascii_letters + string.digits + "@.-_"
