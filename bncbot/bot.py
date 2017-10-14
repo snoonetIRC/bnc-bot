@@ -62,6 +62,12 @@ async def on_raw(conn: 'Conn', event: 'RawEvent', irc_command: str):
         await conn.launch_hook(event, handler)
 
 
+@raw('JOIN')
+def on_join(conn, chan):
+    if chan == conn.log_chan:
+        conn.chan_log("Bot online.")
+
+
 @raw('318')
 async def on_whois_end(conn: 'Conn', irc_paramlist: List[str]):
     to_remove = []

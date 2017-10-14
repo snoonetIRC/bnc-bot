@@ -175,6 +175,8 @@ class Conn:
         self._protocol.quit()
 
     async def shutdown(self, restart=False):
+        self.chan_log("Bot {}...".format("shutting down" if not restart else "restarting"))
+        await asyncio.sleep(1)
         self.close()
         await asyncio.sleep(1, loop=self.loop)
         self.stopped_future.set_result(restart)
