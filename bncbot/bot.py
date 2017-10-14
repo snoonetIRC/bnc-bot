@@ -63,8 +63,8 @@ async def on_raw(conn: 'Conn', event: 'RawEvent', irc_command: str):
 
 
 @raw('JOIN')
-def on_join(conn, chan):
-    if chan == conn.log_chan:
+def on_join(conn, chan, nick):
+    if chan == conn.log_chan and nick.lower() == conn.nick.lower():
         conn.chan_log("Bot online.")
 
 
