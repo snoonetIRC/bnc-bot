@@ -15,7 +15,7 @@ from asyncirc.protocol import IrcProtocol
 from asyncirc.server import Server
 
 from bncbot import irc, util
-from bncbot.async_util import call_func
+from bncbot.async_util import call_func, timer
 
 if TYPE_CHECKING:
     from asyncirc.irc import Message
@@ -117,23 +117,8 @@ class Conn:
         self.loop.stop()
         return restart
 
-    async def timer(self, interval, func, *args, initial_interval=None):
-        if initial_interval is None:
-            initial_interval = interval
-
-        if isinstance(interval, timedelta):
-            interval = interval.total_seconds()
-
-        if isinstance(initial_interval, timedelta):
-            initial_interval = initial_interval.total_seconds()
-
-        await asyncio.sleep(initial_interval)
-        while True:
-            await call_func(func, *args)
-            await asyncio.sleep(interval)
-
     def create_timer(self, interval, func, *args, initial_interval=None):
-        asyncio.ensure_future(self.timer(interval, func, *args, initial_interval=initial_interval), loop=self.loop)
+        asyncio.ensure_future(timer(interval, func, *args, initial_interval=initial_interval), loop=self.loop)
 
     def start_timers(self) -> None:
         self.create_timer(timedelta(hours=8), self.get_user_hosts)
