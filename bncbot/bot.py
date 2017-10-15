@@ -6,7 +6,7 @@ from typing import NamedTuple, Callable, TYPE_CHECKING, List
 
 from bncbot import util
 from bncbot.event import CommandEvent, RawEvent
-from bncbot.util import chunk_str
+from bncbot.util import chunk_str, sanitize_username
 
 if TYPE_CHECKING:
     from bncbot.conn import Conn
@@ -275,8 +275,7 @@ async def cmd_requestbnc(nick: str, conn: 'Conn', message, bnc_users, loop, bnc_
         )
         return
     username = acct
-    if not conn.is_valid_username(username):
-        username = conn.sanitize_username(username)
+    username = sanitize_username(username)
 
     if username in bnc_users:
         message(
