@@ -143,7 +143,7 @@ class Conn:
             bindhost_fut = self.loop.create_future()
             self.futures["bindhost"] = bindhost_fut
             self.module_msg("controlpanel", f"Get BindHost {user}")
-            self.bnc_users[user] = bindhost_fut
+            self.bnc_users[user] = await bindhost_fut
             del self.futures["bindhost"]
 
         self.save_data()
