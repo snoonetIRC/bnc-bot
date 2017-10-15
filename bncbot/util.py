@@ -68,4 +68,5 @@ def sanitize_username(user: str) -> str:
 
 
 def gen_bindhost():
-    return random.choice(BIND_HOST_NET)
+    size = 2 ** BIND_HOST_NET.prefixlen
+    return BIND_HOST_NET[random.randrange(size)]
