@@ -16,6 +16,12 @@ This bot may work with other systems, but this is the setup it was specifically 
 - Generates a temporary password for a user on request approval and sends it to them through MemoServ
 - Tracks existing BNC user accounts to avoid overwriting existing accounts
 
+## Installation
+1. Set up a Python 3.6 virtualenv
+2. `pip install -Ur requirements.txt`
+3. Copy `config.default.json` to `config.json` and modify the values as needed
+4. Run `python -m bncbot` to start the bot
+
 ## Commands
 ### User Commands
 #### `requestbnc`
