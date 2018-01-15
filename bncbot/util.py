@@ -38,11 +38,13 @@ def is_username_valid(name: str) -> bool:
 
 def sanitize_username(user: str) -> str:
     valid = True
-    if user[:1] not in VALID_USER_START_CHARS:
-        new_user = '-'
+    start = user[:1]
+    # Username must start with a letter
+    if start not in VALID_USER_START_CHARS:
+        new_user = 'a'
         valid = False
     else:
-        new_user = user[:1]
+        new_user = start
 
     for c in user[1:]:
         if c in VALID_USER_CHARS:
@@ -58,8 +60,9 @@ def sanitize_username(user: str) -> str:
     md5hash = int.from_bytes(m.digest(), 'big')
     chars = VALID_USER_CHARS
     out = ""
-    while md5hash > len(chars):
-        md5hash, rem = divmod(md5hash, len(chars))
+    size = len(chars)
+    while md5hash > size:
+        md5hash, rem = divmod(md5hash, size)
         out += chars[rem]
 
     out += chars[md5hash]
