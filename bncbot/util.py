@@ -1,14 +1,16 @@
 # coding=utf-8
 import hashlib
-import ipaddress
 import random
 import secrets
 import string
+from ipaddress import IPv4Address, IPv6Address, IPv4Network, IPv6Network
+from typing import Union
 
 VALID_USER_CHARS = string.ascii_letters + string.digits + "@.-_"
 VALID_USER_START_CHARS = string.ascii_letters
 
-BIND_HOST_NET = ipaddress.ip_network("127.0.0.0/16")
+IPNetwork = Union[IPv4Network, IPv6Network]
+IPAddress = Union[IPv4Address, IPv6Address]
 
 
 def gen_pass(chars: str = (string.ascii_letters + string.digits), length: int = 16) -> str:
@@ -70,6 +72,5 @@ def sanitize_username(user: str) -> str:
     return new_user
 
 
-def gen_bindhost():
-    size = 2 ** BIND_HOST_NET.prefixlen
-    return BIND_HOST_NET[random.randrange(size)]
+def get_random_address(net: IPNetwork) -> IPAddress:
+    return net[random.randrange(net.num_addresses)]

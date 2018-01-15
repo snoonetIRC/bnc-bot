@@ -1,6 +1,7 @@
 # coding=utf-8
 import asyncio
 import inspect
+import ipaddress
 import json
 import logging
 import logging.config
@@ -260,7 +261,7 @@ class Conn:
 
     def get_bind_host(self) -> str:
         for _ in range(50):
-            host = str(util.gen_bindhost())
+            host = str(util.get_random_address(self.bind_host_net))
             if host not in self.bnc_users.values():
                 return host
         else:
@@ -300,6 +301,10 @@ class Conn:
     @property
     def log_chan(self) -> Optional[str]:
         return self.config.get('log_channel')
+
+    @property
+    def bind_host_net(self):
+        return ipaddress.ip_network(self.config.get('bind_host_net', "127.0.0.0/16"))
 
     @property
     def log_dir(self):
