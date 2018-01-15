@@ -12,5 +12,6 @@
     "*!*@snoonet/founder/*"
   ],
   "log_channel": "##sysop",
-  "command_prefix": "."
+  "command_prefix": ".",
+  "bind_host_net": "127.0.0.0/16"
 }
