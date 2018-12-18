@@ -114,7 +114,7 @@ async def on_privmsg(event: 'RawEvent', irc_paramlist: List[str], conn: 'Conn',
             if match:
                 user = match.group(1)
                 bnc_users[user] = None
-            elif re.match(r'^[=+]+$', message):
+            elif re.match(r'^([=+]+|[-+]+)$', message):
                 conn.get_users_state += 1
                 if conn.get_users_state == 3:
                     conn.futures['user_list'].set_result(None)
