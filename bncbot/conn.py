@@ -8,9 +8,8 @@ import logging.config
 from collections import defaultdict
 from datetime import timedelta
 from fnmatch import fnmatch
-from operator import itemgetter
 from pathlib import Path
-from typing import List, Optional, Counter, Dict, TYPE_CHECKING
+from typing import List, Optional, Dict, TYPE_CHECKING
 
 from asyncirc.protocol import IrcProtocol
 from asyncirc.server import Server
@@ -149,14 +148,19 @@ class Conn:
 
         self.save_data()
         self.load_data()
-        hosts = list(filter(None, map(itemgetter(0), filter(
-            lambda i: i[1] > 1,
-            Counter(self.bnc_users.values()).items()
-        ))))
+        host_map = defaultdict(list)
+        for user, host in self.bnc_users.items():
+            host_map[host].append(user)
+
+        hosts = {
+            host: users
+            for host, users in host_map.items()
+            if host and len(users) > 1
+        }
         if hosts:
             self.chan_log(
                 "WARNING: Duplicate BindHosts found: {}".format(
-                    ', '.join(hosts)
+                    hosts
                 )
             )
 
