@@ -36,7 +36,14 @@ class Conn:
         if not self.log_dir.exists():
             self.log_dir.mkdir()
 
-        logging.config.dictConfig({
+        self.setup_logger()
+        self.logger = logging.getLogger("bncbot")
+
+    def setup_logger(self):
+        do_debug = self.config.get("debug", False)
+        log_to_file = self.config.get("log_to_file", False)
+
+        logging_conf = {
             "version": 1,
             "formatters": {
                 "brief": {
@@ -54,17 +61,35 @@ class Conn:
                     "formatter": "brief",
                     "level": "DEBUG",
                     "stream": "ext://sys.stdout"
+                }
+            },
+            "loggers": {
+                "bncbot": {
+                    "level": "DEBUG",
+                    "handlers": ["console"]
                 },
-                "file": {
-                    "class": "logging.handlers.RotatingFileHandler",
-                    "maxBytes": 1000000,
-                    "backupCount": 5,
-                    "formatter": "full",
-                    "level": "INFO",
-                    "encoding": "utf-8",
-                    "filename": self.log_dir / "bot.log"
-                },
-                "debug_file": {
+                "asyncio": {
+                    "level": "DEBUG",
+                    "handlers": ["console"]
+                }
+            }
+        }
+
+        if log_to_file:
+            logging_conf['handlers']['file'] = {
+                "class": "logging.handlers.RotatingFileHandler",
+                "maxBytes": 1000000,
+                "backupCount": 5,
+                "formatter": "full",
+                "level": "INFO",
+                "encoding": "utf-8",
+                "filename": self.log_dir / "bot.log"
+            }
+
+            logging_conf['loggers']['bncbot']['handlers'].append('file')
+
+            if do_debug:
+                logging_conf['handlers']['debug_file'] = {
                     "class": "logging.handlers.RotatingFileHandler",
                     "maxBytes": 1000000,
                     "backupCount": 5,
@@ -73,19 +98,7 @@ class Conn:
                     "level": "DEBUG",
                     "filename": self.log_dir / "debug.log"
                 }
-            },
-            "loggers": {
-                "bncbot": {
-                    "level": "DEBUG",
-                    "handlers": ["console", "file"]
-                },
-                "asyncio": {
-                    "level": "DEBUG",
-                    "handlers": ["console", "debug_file"]
-                }
-            }
-        })
-        self.logger = logging.getLogger("bncbot")
+                logging_conf['loggers']['asyncio']['handlers'].append('debug_file')
 
     def load_config(self) -> None:
         with self.config_file.open(encoding='utf8') as f:
