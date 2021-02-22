@@ -1,4 +1,7 @@
 # bnc-bot
+
+**This project has moved to [TotallyNotRobots/bnc-bot](https://github.com/TotallyNotRobots/bnc-bot).**
+
 A bot to handle BNC account requests for Snoonet
 
 ## Designed for
